@@ -9,5 +9,4 @@ else
     export ORIGIN="${ORIGIN}"
 fi
 
-
 exec "$@"

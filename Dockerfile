@@ -1,6 +1,7 @@
 # Frontend Builder
 FROM node:24-alpine AS frontend
 WORKDIR /app
+ENV NODE_OPTIONS=--max-old-space-size=4096
 COPY . .
 RUN npm install -g pnpm && pnpm install
 RUN pnpm run build && pnpm prune --prod
