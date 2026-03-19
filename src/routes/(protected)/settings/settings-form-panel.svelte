@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { ActionData, PageData } from "./$types";
+    import { invalidateAll } from "$app/navigation";
     import { BasicForm } from "@sjsf/form";
     import { createMeta, setupSvelteKitForm } from "@sjsf/sveltekit/client";
     import * as defaults from "$lib/components/settings/form-defaults";
@@ -17,14 +18,12 @@
         icons,
         delayedMs: 500,
         timeoutMs: 30000,
-        onSuccess: (result) => {
+        reset: false,
+        invalidateAll: false,
+        onSuccess: async (result) => {
             if (result.type === "success") {
                 toast.success(`${data.currentTab.label} settings saved`);
-
-                // Force a real refresh so the UI always reflects persisted backend state.
-                queueMicrotask(() => {
-                    window.location.replace(window.location.pathname + window.location.search);
-                });
+                await invalidateAll();
             } else {
                 toast.error("Failed to save settings");
             }

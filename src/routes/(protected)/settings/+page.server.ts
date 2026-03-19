@@ -202,6 +202,7 @@ export const load: PageServerLoad = async ({ fetch, locals, url }) => {
 
     const schema = await getSchemaForTab(locals.backendUrl, locals.apiKey, activeTab, fetch);
     const initialSettings = toRecord(allSettings.data);
+    const initialValue = pickKeys(initialSettings, activeTab.keys);
 
     return {
         activeTab: activeTab.key,
@@ -210,6 +211,7 @@ export const load: PageServerLoad = async ({ fetch, locals, url }) => {
             label: activeTab.label,
             title: activeTab.title
         },
+        formKey: `${activeTab.key}:${JSON.stringify(initialValue)}`,
         tabs: SETTINGS_TABS.map(({ key, label, title }) => ({
             key,
             label,
@@ -218,7 +220,7 @@ export const load: PageServerLoad = async ({ fetch, locals, url }) => {
         })),
         form: {
             schema,
-            initialValue: pickKeys(initialSettings, activeTab.keys)
+            initialValue
         } satisfies InitialFormData
     };
 };

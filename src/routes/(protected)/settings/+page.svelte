@@ -46,7 +46,7 @@
             </div>
 
             <div class="min-h-0 flex-1 overflow-y-auto pr-1">
-                {#key `${data.activeTab}:${data.currentTab.title}`}
+                {#key data.formKey}
                     <SettingsFormPanel {data} />
                 {/key}
             </div>
