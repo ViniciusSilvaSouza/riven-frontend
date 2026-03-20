@@ -96,6 +96,28 @@ function buildTVDBImage(path: string | null) {
     return `${TVDB_ARTWORK_BASE_URL}${path}`;
 }
 
+function pickPreferredTVDBTranslation<T extends { language?: string | null }>(
+    translations: T[] | null | undefined,
+    preferredLanguage: string,
+    fallbackToEnglish: boolean = true
+) {
+    if (!translations?.length) return undefined;
+
+    const preferred = translations.find(
+        (translation) => translation.language === preferredLanguage
+    );
+
+    if (preferred) {
+        return preferred;
+    }
+
+    if (fallbackToEnglish && preferredLanguage !== "eng") {
+        return translations.find((translation) => translation.language === "eng");
+    }
+
+    return translations[0];
+}
+
 function resolveTrailerSite(url: string | null) {
     if (!url) return null;
     try {
@@ -390,7 +412,11 @@ interface TVDBSearchItem {
     genres?: (string | { name: string })[];
 }
 
-export function transformTVDBList(items: TVDBSearchItem[] | null): TMDBTransformedListItem[] {
+export function transformTVDBList(
+    items: TVDBSearchItem[] | null,
+    preferredLanguage: string = "eng",
+    fallbackToEnglish: boolean = true
+): TMDBTransformedListItem[] {
     return (
         items?.reduce((acc, item) => {
             if (item.type !== "series") return acc;
@@ -408,9 +434,13 @@ export function transformTVDBList(items: TVDBSearchItem[] | null): TMDBTransform
                 }
             }
 
+            const preferredTranslation =
+                (preferredLanguage && item.translations?.[preferredLanguage]) ||
+                (fallbackToEnglish ? item.translations?.eng : undefined);
+
             acc.push({
                 id,
-                title: item.translations?.eng || item.name || "Unknown",
+                title: preferredTranslation || item.name || "Unknown",
                 poster_path: buildTVDBImage(item.image_url ?? null),
                 media_type: "tv",
                 year: item.year ?? dateUtils.getYearFromISO(item.first_air_time) ?? "N/A",
@@ -940,35 +970,48 @@ function selectArtwork(
 
 export function parseTVDBShowDetails(
     data: TVDBBaseItem | null,
-    traktRecs: unknown[] | null = null
+    traktRecs: unknown[] | null = null,
+    options: {
+        preferredLanguage?: string;
+        fallbackToEnglish?: boolean;
+    } = {}
 ): ParsedShowDetails | null {
     if (!data) return null;
+
+    const preferredLanguage = options.preferredLanguage ?? "eng";
+    const fallbackToEnglish = options.fallbackToEnglish ?? true;
 
     const runtime = data.averageRuntime ?? null;
 
     let title = data.name;
     const originalTitle = data.name;
 
-    const engTitle = data.translations?.nameTranslations?.find(
-        (t) => t.language === "eng" && !t.isAlias
+    const preferredTitle = pickPreferredTVDBTranslation(
+        data.translations?.nameTranslations?.filter((translation) => !translation.isAlias),
+        preferredLanguage,
+        fallbackToEnglish
     )?.name;
 
-    const engAlias = data.translations?.nameTranslations?.find(
-        (t) => t.language === "eng" && t.isAlias
+    const preferredAlias = pickPreferredTVDBTranslation(
+        data.translations?.nameTranslations?.filter((translation) => translation.isAlias),
+        preferredLanguage,
+        fallbackToEnglish
     )?.name;
 
-    title = engTitle || engAlias || data.name;
+    title = preferredTitle || preferredAlias || data.name;
 
     let overview = data.overview;
-    const engOverview = data.translations?.overviewTranslations?.find(
-        (t) => t.language === "eng"
+    const preferredOverview = pickPreferredTVDBTranslation(
+        data.translations?.overviewTranslations,
+        preferredLanguage,
+        fallbackToEnglish
     )?.overview;
 
-    overview = engOverview || data.overview;
+    overview = preferredOverview || data.overview;
 
     const posterPath = buildTVDBImage(
-        selectArtwork(data.artworks, (art) => art.type === 2 || art.type === 14, "eng")?.image ??
-            data.image
+        selectArtwork(data.artworks, (art) => art.type === 2 || art.type === 14, preferredLanguage)
+            ?.image ?? data.image
     );
 
     const backdropPath = buildTVDBImage(
@@ -977,8 +1020,8 @@ export function parseTVDBShowDetails(
     );
 
     const logoPath = buildTVDBImage(
-        selectArtwork(data.artworks, (art) => art.type === 23 || art.type === 25, "eng")?.image ??
-            null
+        selectArtwork(data.artworks, (art) => art.type === 23 || art.type === 25, preferredLanguage)
+            ?.image ?? null
     );
 
     function extractYoutubeKey(url: string | null): string | undefined {

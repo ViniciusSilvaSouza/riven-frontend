@@ -5,6 +5,7 @@ import providers from "$lib/providers";
 import { transformTMDBList, type TMDBListItem } from "$lib/providers/parser";
 import { createCustomFetch } from "$lib/custom-fetch";
 import { createScopedLogger } from "$lib/logger";
+import { getMetadataLocale } from "$lib/server/metadata-locale";
 
 const logger = createScopedLogger("tmdb-trending");
 
@@ -27,6 +28,12 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
     logger.info(`Fetching trending ${type} for window ${window}`);
 
     try {
+        const metadataLocale = await getMetadataLocale({
+            apiKey: locals.apiKey,
+            baseUrl: locals.backendUrl,
+            fetch
+        });
+
         if (type === "movie") {
             const trending = await providers.tmdb.GET("/3/trending/movie/{time_window}", {
                 params: {
@@ -34,13 +41,14 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
                         time_window: window as TMDBTimeWindow
                     },
                     query: {
+                        language: metadataLocale.tmdbLanguage,
                         page
-                    } as any
+                    }
                 },
                 fetch: customFetch
             });
 
-            if ((trending as any).error) {
+            if (trending.error) {
                 error(500, "Failed to fetch trending movies");
             }
 
@@ -56,13 +64,14 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
                         time_window: window as TMDBTimeWindow
                     },
                     query: {
+                        language: metadataLocale.tmdbLanguage,
                         page
-                    } as any
+                    }
                 },
                 fetch: customFetch
             });
 
-            if ((trending as any).error) {
+            if (trending.error) {
                 error(500, "Failed to fetch trending TV shows");
             }
 

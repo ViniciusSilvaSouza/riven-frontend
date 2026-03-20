@@ -37,6 +37,7 @@ const SETTINGS_TABS: SettingsTab[] = [
             "enable_network_tracing",
             "enable_stream_tracing",
             "retry_interval",
+            "metadata",
             "tracemalloc",
             "logging",
             "notifications",

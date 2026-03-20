@@ -1,16 +1,45 @@
 import type { RequestHandler } from "./$types";
 import { json, error } from "@sveltejs/kit";
 import providers from "$lib/providers";
+import type { paths as TVDBPaths } from "$lib/providers/tvdb";
 import * as dateUtils from "$lib/utils/date";
 import { createCustomFetch } from "$lib/custom-fetch";
 import { createScopedLogger } from "$lib/logger";
+import { getMetadataLocale } from "$lib/server/metadata-locale";
 
 const logger = createScopedLogger("tvdb-search");
+type SearchQuery = NonNullable<TVDBPaths["/search"]["get"]["parameters"]["query"]>;
+type FilterValue = string | number;
+type FilterableTVDBResult = {
+    first_air_date: string | null;
+    id: number;
+    indexer: "tvdb";
+    media_type: "tv";
+    overview: string | null;
+    poster_path: string | null;
+    title: string;
+    vote_average: number | null;
+    vote_count: number | null;
+    year: number | string;
+};
+type TVDBSearchApiItem = {
+    first_air_time?: string | null;
+    image_url?: string | null;
+    name?: string | null;
+    overview?: string | null;
+    translations?: Record<string, string | undefined>;
+    tvdb_id?: number | null;
+    type?: string | null;
+    year?: number | null;
+};
 
 /**
  * Apply server-side filters to TVDB results
  */
-function applyServerFilters(items: any[], filters: Record<string, any>): any[] {
+function applyServerFilters(
+    items: FilterableTVDBResult[],
+    filters: Record<string, FilterValue>
+): FilterableTVDBResult[] {
     if (!filters || Object.keys(filters).length === 0) {
         return items;
     }
@@ -86,7 +115,7 @@ export const GET: RequestHandler = async ({ fetch, locals, url, cookies }) => {
     const offset = (page - 1) * limit;
 
     // Extract client-side filters
-    const clientFilters: Record<string, any> = {};
+    const clientFilters: Record<string, FilterValue> = {};
     const CLIENT_FILTERABLE = new Set([
         "vote_average.gte",
         "vote_average.lte",
@@ -123,6 +152,12 @@ export const GET: RequestHandler = async ({ fetch, locals, url, cookies }) => {
     }
 
     try {
+        const metadataLocale = await getMetadataLocale({
+            apiKey: locals.apiKey,
+            baseUrl: locals.backendUrl,
+            fetch
+        });
+
         // Build query parameters - only include defined values
         const searchParams: Record<string, string | number> = {
             type: type,
@@ -142,7 +177,7 @@ export const GET: RequestHandler = async ({ fetch, locals, url, cookies }) => {
         // Make search request to TVDB using the provider client
         const searchResult = await providers.tvdb.GET("/search", {
             params: {
-                query: searchParams as any
+                query: searchParams as SearchQuery
             },
             headers: {
                 Authorization: `Bearer ${tvdbToken}`
@@ -155,20 +190,26 @@ export const GET: RequestHandler = async ({ fetch, locals, url, cookies }) => {
             error(500, "Failed to search TVDB");
         }
 
-        const transformedResults = (searchResult.data?.data || [])
-            .filter((item: any) => item.type === "series")
-            .map((item: any) => ({
-                id: item.tvdb_id,
-                title: item.translations?.eng || item.name || "Unknown",
-                poster_path: item.image_url || null,
-                media_type: "tv",
-                year: item.year || (dateUtils.getYearFromISO(item.first_air_time) ?? "N/A"),
-                vote_average: null,
-                vote_count: null,
-                overview: item.overview || null,
-                first_air_date: item.first_air_time || null,
-                indexer: "tvdb"
-            }));
+        const transformedResults = ((searchResult.data?.data || []) as TVDBSearchApiItem[])
+            .filter((item) => item.type === "series")
+            .map(
+                (item): FilterableTVDBResult => ({
+                    id: item.tvdb_id ?? 0,
+                    title:
+                        item.translations?.[metadataLocale.tvdbLanguage] ||
+                        (metadataLocale.fallbackToEnglish ? item.translations?.eng : undefined) ||
+                        item.name ||
+                        "Unknown",
+                    poster_path: item.image_url || null,
+                    media_type: "tv",
+                    year: item.year || (dateUtils.getYearFromISO(item.first_air_time) ?? "N/A"),
+                    vote_average: null,
+                    vote_count: null,
+                    overview: item.overview || null,
+                    first_air_date: item.first_air_time || null,
+                    indexer: "tvdb"
+                })
+            );
 
         // Apply server-side filters
         const filteredResults = applyServerFilters(transformedResults, clientFilters);

@@ -1,10 +1,10 @@
 import type { RequestHandler } from "./$types";
 import { json, error } from "@sveltejs/kit";
-import { TMDB_IMAGE_BASE_URL } from "$lib/providers";
 import providers from "$lib/providers";
 import { transformTMDBList, type TMDBListItem } from "$lib/providers/parser";
 import { createCustomFetch } from "$lib/custom-fetch";
 import { createScopedLogger } from "$lib/logger";
+import { getMetadataLocale } from "$lib/server/metadata-locale";
 
 const logger = createScopedLogger("tmdb-discover");
 
@@ -23,8 +23,16 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
     logger.info(`Discovering ${type}s with params:`, Object.fromEntries(url.searchParams));
 
     try {
+        const metadataLocale = await getMetadataLocale({
+            apiKey: locals.apiKey,
+            baseUrl: locals.backendUrl,
+            fetch
+        });
+
         // Get all query parameters from the URL
-        const queryParams: Record<string, unknown> = {};
+        const queryParams: Record<string, unknown> = {
+            language: metadataLocale.tmdbLanguage
+        };
 
         // Convert URL search params to object
         for (const [key, value] of url.searchParams) {
@@ -65,7 +73,7 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
                 fetch: customFetch
             });
 
-            if ((discover as any).error) {
+            if (discover.error) {
                 logger.error("TMDB API error:", discover.error);
                 error(500, "Failed to discover movies");
             }
@@ -87,7 +95,7 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
                 fetch: customFetch
             });
 
-            if ((discover as any).error) {
+            if (discover.error) {
                 logger.error("TMDB API error:", discover.error);
                 error(500, "Failed to discover TV shows");
             }

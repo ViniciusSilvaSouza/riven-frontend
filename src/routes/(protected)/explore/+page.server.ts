@@ -11,8 +11,9 @@ import {
 } from "$lib/providers/parser";
 import { createCustomFetch } from "$lib/custom-fetch";
 import { logger } from "$lib/logger";
+import { getMetadataLocale } from "$lib/server/metadata-locale";
 
-export const load: PageServerLoad = async ({ url, fetch }) => {
+export const load: PageServerLoad = async ({ url, fetch, locals }) => {
     // Parse and validate search params from the URL
     const form = await superValidate(url.searchParams, zod4(searchSchema));
     const parsed = parseSearchQuery(form.data.query || "");
@@ -24,6 +25,11 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
 
     try {
         const customFetch = createCustomFetch(fetch);
+        const metadataLocale = await getMetadataLocale({
+            apiKey: locals.apiKey,
+            baseUrl: locals.backendUrl,
+            fetch
+        });
 
         // Generate 4 distinct random pages to ensure variety
         const randomPagePopMovie = Math.floor(Math.random() * 50) + 1;
@@ -37,40 +43,40 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
                 providers.tmdb.GET("/3/trending/movie/{time_window}", {
                     params: {
                         path: { time_window: "week" },
-                        query: { language: "en-US" }
+                        query: { language: metadataLocale.tmdbLanguage }
                     },
                     fetch: customFetch
                 }),
                 providers.tmdb.GET("/3/trending/tv/{time_window}", {
                     params: {
                         path: { time_window: "week" },
-                        query: { language: "en-US" }
+                        query: { language: metadataLocale.tmdbLanguage }
                     },
                     fetch: customFetch
                 }),
                 // Random popular content
                 providers.tmdb.GET("/3/movie/popular", {
                     params: {
-                        query: { page: randomPagePopMovie, language: "en-US" }
+                        query: { page: randomPagePopMovie, language: metadataLocale.tmdbLanguage }
                     },
                     fetch: customFetch
                 }),
                 providers.tmdb.GET("/3/tv/popular", {
                     params: {
-                        query: { page: randomPagePopTV, language: "en-US" }
+                        query: { page: randomPagePopTV, language: metadataLocale.tmdbLanguage }
                     },
                     fetch: customFetch
                 }),
                 // Random top rated content
                 providers.tmdb.GET("/3/movie/top_rated", {
                     params: {
-                        query: { page: randomPageTopMovie, language: "en-US" }
+                        query: { page: randomPageTopMovie, language: metadataLocale.tmdbLanguage }
                     },
                     fetch: customFetch
                 }),
                 providers.tmdb.GET("/3/tv/top_rated", {
                     params: {
-                        query: { page: randomPageTopTV, language: "en-US" }
+                        query: { page: randomPageTopTV, language: metadataLocale.tmdbLanguage }
                     },
                     fetch: customFetch
                 })

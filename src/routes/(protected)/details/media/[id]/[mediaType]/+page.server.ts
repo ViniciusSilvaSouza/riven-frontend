@@ -11,6 +11,7 @@ import { error } from "@sveltejs/kit";
 import { createCustomFetch } from "$lib/custom-fetch";
 import { createScopedLogger } from "$lib/logger";
 import { resolveId } from "$lib/services/resolver";
+import { getMetadataLocale } from "$lib/server/metadata-locale";
 
 const logger = createScopedLogger("media-details");
 
@@ -127,6 +128,11 @@ async function getTraktData(fetch: typeof globalThis.fetch, mediaId: string, isM
 export const load = (async ({ fetch, params, cookies, locals, url }) => {
     const { id, mediaType } = params;
     const customFetch = createCustomFetch(fetch);
+    const metadataLocale = await getMetadataLocale({
+        apiKey: locals.apiKey,
+        baseUrl: locals.backendUrl,
+        fetch
+    });
 
     try {
         if (mediaType !== "movie" && mediaType !== "tv") {
@@ -161,7 +167,8 @@ export const load = (async ({ fetch, params, cookies, locals, url }) => {
                             },
                             query: {
                                 append_to_response:
-                                    "external_ids,images,recommendations,similar,videos,credits,release_dates"
+                                    "external_ids,images,recommendations,similar,videos,credits,release_dates",
+                                language: metadataLocale.tmdbLanguage
                             }
                         },
                         fetch: customFetch
@@ -349,7 +356,11 @@ export const load = (async ({ fetch, params, cookies, locals, url }) => {
             const validatedData = assertTVDBShowData(details.data);
             const parsedDetails = providers.parser.parseTVDBShowDetails(
                 validatedData,
-                traktResult.traktRecs
+                traktResult.traktRecs,
+                {
+                    preferredLanguage: metadataLocale.tvdbLanguage,
+                    fallbackToEnglish: metadataLocale.fallbackToEnglish
+                }
             );
 
             return {

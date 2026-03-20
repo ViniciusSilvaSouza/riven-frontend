@@ -5,6 +5,7 @@ import { transformTMDBList, type TMDBListItem } from "$lib/providers/parser";
 import { createCustomFetch } from "$lib/custom-fetch";
 import { createScopedLogger } from "$lib/logger";
 import type { paths } from "$lib/providers/tmdb";
+import { getMetadataLocale } from "$lib/server/metadata-locale";
 
 const logger = createScopedLogger("tmdb-search");
 
@@ -41,6 +42,11 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
 
     try {
         const parsed = parseParams(url.searchParams);
+        const metadataLocale = await getMetadataLocale({
+            apiKey: locals.apiKey,
+            baseUrl: locals.backendUrl,
+            fetch
+        });
 
         // Call the appropriate typed endpoint
         const fetchResults = async () => {
@@ -63,7 +69,10 @@ export const GET: RequestHandler = async ({ fetch, params, locals, url }) => {
             } as const;
 
             const route = ROUTE_MAP[routeKey as keyof typeof ROUTE_MAP];
-            const query = { ...parsed[route.queryKey] };
+            const query = {
+                language: metadataLocale.tmdbLanguage,
+                ...parsed[route.queryKey]
+            };
 
             logger.debug(`Route: ${routeKey}, endpoint: ${route.endpoint}, query:`, query);
 
