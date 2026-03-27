@@ -59,6 +59,19 @@
         { label: "High", color: "var(--chart-2)" },
         { label: "Very High", color: "var(--chart-1)" }
     ];
+
+    const pipelineHealth = $derived(((data.statistics as any)?.pipeline_health ?? {}) as Record<
+        string,
+        any
+    >);
+
+    const pipelineStatus = $derived.by(() => {
+        const health = pipelineHealth.health ?? {};
+        if (health.is_stalled) return { label: "Critical", className: "text-red-400" };
+        if ((pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_20 ?? 0) > 0)
+            return { label: "Degraded", className: "text-amber-300" };
+        return { label: "Healthy", className: "text-green-400" };
+    });
 </script>
 
 <svelte:head>
@@ -119,6 +132,29 @@
             title: "Completion Rate",
             value: completionRate,
             sub: "Completed / Total"
+        })}
+    </section>
+
+    <section class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {@render KPICard({
+            title: "Pipeline Health",
+            value: pipelineStatus.label,
+            sub: "Overall operational status"
+        })}
+        {@render KPICard({
+            title: "Completed (1h)",
+            value: `${pipelineHealth.throughput?.completed_1h ?? 0}`,
+            sub: "Items completed in last hour"
+        })}
+        {@render KPICard({
+            title: "P95 Completion (h)",
+            value: pipelineHealth.completion_time?.p95_hours?.toString() ?? "-",
+            sub: "Requested -> completed (95th)"
+        })}
+        {@render KPICard({
+            title: "Indexed Backlog",
+            value: `${pipelineHealth.health?.indexed_backlog ?? 0}`,
+            sub: "Items waiting to complete"
         })}
     </section>
 
@@ -256,6 +292,90 @@
                         {/snippet}
                     </LineChart>
                 </ResponsiveChartContainer>
+            </Card.Content>
+        </Card.Root>
+    </section>
+
+    <section class="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card.Root>
+            <Card.Header class="pb-2">
+                <Card.Title class="text-sm font-medium text-neutral-300">Pipeline Diagnostics</Card.Title>
+            </Card.Header>
+            <Card.Content class="space-y-2 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Status</span>
+                    <span class={`ml-auto font-semibold ${pipelineStatus.className}`}>
+                        {pipelineStatus.label}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Last Completion</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.health?.minutes_since_last_completed ?? "-"} min ago
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Avg Completion Time</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.completion_time?.avg_hours ?? "-"} h
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">P50 Completion Time</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.completion_time?.p50_hours ?? "-"} h
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">P95 Completion Time</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.completion_time?.p95_hours ?? "-"} h
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Indexed Avg Age</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.backlog_age?.avg_indexed_age_hours ?? "-"} h
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Indexed Max Age</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.backlog_age?.max_indexed_age_hours ?? "-"} h
+                    </span>
+                </div>
+            </Card.Content>
+        </Card.Root>
+
+        <Card.Root>
+            <Card.Header class="pb-2">
+                <Card.Title class="text-sm font-medium text-neutral-300">Bottleneck Signals</Card.Title>
+            </Card.Header>
+            <Card.Content class="space-y-2 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Failed Attempts >= 10</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_10 ?? 0}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Failed Attempts >= 15</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_15 ?? 0}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-neutral-400">Failed Attempts >= 20</span>
+                    <span class="ml-auto font-mono text-neutral-100">
+                        {pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_20 ?? 0}
+                    </span>
+                </div>
+                <div class="mt-4 border-t border-neutral-800 pt-4">
+                    <p class="text-xs text-neutral-400">
+                        These indicators highlight items repeatedly failing to progress and help identify
+                        whether backlog is caused by source quality, filtering, or downstream availability.
+                    </p>
+                </div>
             </Card.Content>
         </Card.Root>
     </section>
