@@ -6,12 +6,9 @@
     import * as Chart from "$lib/components/ui/chart/index.js";
     import ResponsiveChartContainer from "$lib/components/media/riven/responsive-chart-container.svelte";
     import { Badge } from "$lib/components/ui/badge/index.js";
-    import { BarChart, PieChart, LineChart } from "layerchart";
+    import { BarChart, PieChart } from "layerchart";
     import { formatBytes, formatDate, getServiceDisplayName } from "$lib/helpers";
     import Heatmap from "$lib/components/heatmap.svelte";
-    import { curveCatmullRom } from "d3-shape";
-    import { fly } from "svelte/transition";
-    import { cubicOut } from "svelte/easing";
 
     let { data }: { data: PageData } = $props();
 
@@ -71,6 +68,20 @@
         if ((pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_20 ?? 0) > 0)
             return { label: "Degraded", className: "text-amber-300" };
         return { label: "Healthy", className: "text-green-400" };
+    });
+
+    const releaseYearBars = $derived.by(() => {
+        const src = data.statistics?.media_year_releases || [];
+        return [...src]
+            .sort((a, b) => {
+                if (a.year === null) return 1;
+                if (b.year === null) return -1;
+                return (a.year ?? 0) - (b.year ?? 0);
+            })
+            .map((row) => ({
+                yearLabel: row.year === null ? "Unknown" : String(row.year),
+                count: row.count ?? 0
+            }));
     });
 </script>
 
@@ -147,14 +158,14 @@
             sub: "Items completed in last hour"
         })}
         {@render KPICard({
-            title: "P95 Completion (h)",
+            title: "Completion Time (95%)",
             value: pipelineHealth.completion_time?.p95_hours?.toString() ?? "-",
-            sub: "Requested -> completed (95th)"
+            sub: "95% of items complete within this time"
         })}
         {@render KPICard({
-            title: "Indexed Backlog",
-            value: `${pipelineHealth.health?.indexed_backlog ?? 0}`,
-            sub: "Items waiting to complete"
+            title: "Last Completion",
+            value: `${pipelineHealth.health?.minutes_since_last_completed ?? "-"} min`,
+            sub: "Time since the latest completed item"
         })}
     </section>
 
@@ -274,23 +285,21 @@
                 <ResponsiveChartContainer
                     config={{}}
                     class="aspect-3/1 w-full md:aspect-4/1 lg:aspect-5/1 2xl:aspect-6/1">
-                    <LineChart
-                        data={data.statistics?.media_year_releases || []}
-                        x="year"
-                        series={[
-                            {
-                                key: "count",
-                                color: "var(--chart-1)"
-                            }
-                        ]}
-                        labels={{ offset: 10 }}
-                        points
+                    <BarChart
+                        data={releaseYearBars}
+                        x="yearLabel"
+                        y="count"
+                        c="yearLabel"
                         padding={{ top: 16, bottom: 32, left: 32, right: 16 }}
-                        props={{ spline: { curve: curveCatmullRom } }}>
+                        props={{
+                            bars: {
+                                class: "fill-primary"
+                            }
+                        }}>
                         {#snippet tooltip()}
                             <Chart.Tooltip />
                         {/snippet}
-                    </LineChart>
+                    </BarChart>
                 </ResponsiveChartContainer>
             </Card.Content>
         </Card.Root>
@@ -321,17 +330,21 @@
                     </span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-neutral-400">P50 Completion Time</span>
+                    <span class="text-neutral-400">Completion Time (50%)</span>
                     <span class="ml-auto font-mono text-neutral-100">
                         {pipelineHealth.completion_time?.p50_hours ?? "-"} h
                     </span>
                 </div>
+                <p class="text-xs text-neutral-500">Half of items complete within this time.</p>
                 <div class="flex items-center gap-2">
-                    <span class="text-neutral-400">P95 Completion Time</span>
+                    <span class="text-neutral-400">Completion Time (95%)</span>
                     <span class="ml-auto font-mono text-neutral-100">
                         {pipelineHealth.completion_time?.p95_hours ?? "-"} h
                     </span>
                 </div>
+                <p class="text-xs text-neutral-500">
+                    95% of items complete within this time. Higher values indicate queue pressure.
+                </p>
                 <div class="flex items-center gap-2">
                     <span class="text-neutral-400">Indexed Avg Age</span>
                     <span class="ml-auto font-mono text-neutral-100">
@@ -358,24 +371,27 @@
                         {pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_10 ?? 0}
                     </span>
                 </div>
+                <p class="text-xs text-neutral-500">
+                    Items still indexed after 10+ failed processing attempts.
+                </p>
                 <div class="flex items-center gap-2">
                     <span class="text-neutral-400">Failed Attempts >= 15</span>
                     <span class="ml-auto font-mono text-neutral-100">
                         {pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_15 ?? 0}
                     </span>
                 </div>
+                <p class="text-xs text-neutral-500">
+                    Warning band: likely source/filter mismatch or recurring downstream issue.
+                </p>
                 <div class="flex items-center gap-2">
                     <span class="text-neutral-400">Failed Attempts >= 20</span>
                     <span class="ml-auto font-mono text-neutral-100">
                         {pipelineHealth.bottlenecks?.indexed_failed_attempts_ge_20 ?? 0}
                     </span>
                 </div>
-                <div class="mt-4 border-t border-neutral-800 pt-4">
-                    <p class="text-xs text-neutral-400">
-                        These indicators highlight items repeatedly failing to progress and help identify
-                        whether backlog is caused by source quality, filtering, or downstream availability.
-                    </p>
-                </div>
+                <p class="text-xs text-neutral-500">
+                    Critical band: strong signal of frozen backlog without intervention.
+                </p>
             </Card.Content>
         </Card.Root>
     </section>
