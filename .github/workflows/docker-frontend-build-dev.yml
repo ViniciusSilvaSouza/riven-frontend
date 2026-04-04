@@ -11,7 +11,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    REGISTRY_IMAGE_GHCR: ghcr.io/${{ github.repository_owner }}/riven-multi-debrid-queue-orchestrator-frontend
+    REGISTRY_IMAGE_GHCR: ghcr.io/${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}/riven-multi-debrid-queue-orchestrator-frontend
 
 jobs:
     build:
@@ -60,8 +60,8 @@ jobs:
               uses: docker/login-action@v3
               with:
                   registry: ghcr.io
-                  username: ${{ github.repository_owner }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+                  username: ${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}
+                  password: ${{ secrets.GHCR_PUBLISH_TOKEN != '' && secrets.GHCR_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
@@ -114,8 +114,8 @@ jobs:
               uses: docker/login-action@v3
               with:
                   registry: ghcr.io
-                  username: ${{ github.repository_owner }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+                  username: ${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}
+                  password: ${{ secrets.GHCR_PUBLISH_TOKEN != '' && secrets.GHCR_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3

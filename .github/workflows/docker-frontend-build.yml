@@ -7,7 +7,7 @@ on:
     workflow_dispatch:
 
 env:
-    REGISTRY_IMAGE_GHCR: ghcr.io/${{ github.repository_owner }}/riven-multi-debrid-queue-orchestrator-frontend
+    REGISTRY_IMAGE_GHCR: ghcr.io/${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}/riven-multi-debrid-queue-orchestrator-frontend
 
 jobs:
     build-and-push:
@@ -34,8 +34,8 @@ jobs:
               uses: docker/login-action@v3
               with:
                   registry: ghcr.io
-                  username: ${{ github.repository_owner }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+                  username: ${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}
+                  password: ${{ secrets.GHCR_PUBLISH_TOKEN != '' && secrets.GHCR_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
 
             - name: Build Docker Metadata
               id: docker-metadata
