@@ -3,11 +3,10 @@ name: Docker Build and Push frontend
 on:
     push:
         tags:
-            - "v[0-9]+.[0-9]+.[0-9]+"
-    workflow_dispatch:
+            - "v*.*.*"
 
 env:
-    REGISTRY_IMAGE_GHCR: ghcr.io/${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}/riven-multi-debrid-queue-orchestrator-frontend
+    REGISTRY_IMAGE_GHCR: ghcr.io/${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || 'viniciussilvasouza' }}/riven-multi-debrid-queue-orchestrator-frontend
 
 jobs:
     build-and-push:
@@ -34,8 +33,8 @@ jobs:
               uses: docker/login-action@v3
               with:
                   registry: ghcr.io
-                  username: ${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || github.repository_owner }}
-                  password: ${{ secrets.GHCR_PUBLISH_TOKEN != '' && secrets.GHCR_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+                  username: ${{ vars.GHCR_OWNER != '' && vars.GHCR_OWNER || 'viniciussilvasouza' }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Build Docker Metadata
               id: docker-metadata
@@ -47,7 +46,6 @@ jobs:
                       latest=auto
                   tags: |
                       type=ref,event=tag
-                      type=sha,commit=${{ github.sha }}
                       type=semver,pattern={{version}}
                       type=raw,value=stable
                       type=raw,value=latest,enable={{is_default_branch}}
